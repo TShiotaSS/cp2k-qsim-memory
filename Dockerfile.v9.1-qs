@@ -1,0 +1,103 @@
+ARG BASE_IMAGE=ubuntu:22.04
+FROM ${BASE_IMAGE}
+ARG GCC_VERSION=9
+ARG LIBINT_LMAX=5
+USER root
+# author: Ole Schuett
+# Installs lean toolchain without MPI and relying mostly on Ubuntu packages.
+# Install Ubuntu packages.
+RUN apt-get -y update
+RUN apt-get -y install git
+WORKDIR /opt
+RUN git clone --recursive https://github.com/cp2k/cp2k.git -b support/v9.1
+RUN ./cp2k/tools/toolchain/install_requirements_ubuntu.sh 
+
+# Install some more Ubuntu packages.
+RUN export DEBIAN_FRONTEND=noninteractive DEBCONF_NONINTERACTIVE_SEEN=true && \
+    apt-get update -qq && apt-get install -qq --no-install-recommends \
+    cmake \
+    gcc-${GCC_VERSION} \
+    g++-${GCC_VERSION} \
+    gfortran-${GCC_VERSION} \
+    fftw3-dev \
+    libopenblas-dev \
+    libgsl-dev \
+    libhdf5-dev \
+    wget \
+   && rm -rf /var/lib/apt/lists/*
+
+# Create links.
+RUN ln -sf gcc-${GCC_VERSION}      /usr/bin/gcc  && \
+    ln -sf g++-${GCC_VERSION}      /usr/bin/g++  && \
+    ln -sf gfortran-${GCC_VERSION} /usr/bin/gfortran
+
+# Build toolchain.
+
+RUN sed -i -e s/atztogo/spglib/g /opt/cp2k/tools/toolchain/scripts/stage7/install_spglib.sh
+RUN chmod 777 /opt/cp2k/tools/toolchain/scripts/stage7/install_spglib.sh
+
+RUN mkdir ./cp2k-toolchain/
+RUN cp -r ./cp2k/tools/toolchain/scripts ./cp2k-toolchain/scripts
+RUN cp  ./cp2k/tools/toolchain/install_cp2k_toolchain.sh ./cp2k-toolchain
+WORKDIR /opt/cp2k-toolchain
+RUN ./install_cp2k_toolchain.sh  \
+    --mpi-mode=no                \
+    --with-gcc=system            \
+    --with-cmake=system          \
+    --with-fftw=system           \
+    --with-openblas=system       \
+    --with-gsl=system            \
+    --with-hdf5=system           \
+    --with-libxc=install         \
+    --with-libxsmm=install       \
+    --with-libint=install        \
+    --libint-lmax=${LIBINT_LMAX}
+RUN ./scripts/generate_arch_files.sh && rm -rf ./build
+
+WORKDIR /opt/
+RUN /bin/bash -c " \
+    cp ./cp2k-toolchain/install/arch/* ./cp2k/arch && \
+    source ./cp2k-toolchain/install/setup "
+
+WORKDIR /opt/cp2k
+
+RUN wget https://bootstrap.pypa.io/get-pip.py
+RUN apt-get -y update
+RUN apt-get -y install python3-pip
+RUN apt-get -y install vim
+ENV TZ=Asia/Tokyo
+RUN ln -snf /usr/share/zoneinfo/$TZ /etc/localtime && echo $TZ > /etc/timezone
+
+
+RUN apt -y  install build-essential libbz2-dev libdb-dev   libreadline-dev libffi-dev libgdbm-dev liblzma-dev   libncursesw5-dev libsqlite3-dev libssl-dev   zlib1g-dev uuid-dev tk-dev
+
+RUN wget https://repo.anaconda.com/archive/Anaconda3-2022.05-Linux-x86_64.sh && chmod 777 Anaconda3-2022.05-Linux-x86_64.sh && ./Anaconda3-2022.05-Linux-x86_64.sh -b 
+
+ENV PATH=/root/anaconda3/bin:$PATH
+RUN export PATH
+RUN echo $PATH
+
+RUN pip3 install qulacs
+RUN pip3 install fqe
+RUN pip3 install openfermion
+RUN apt-get -y update && apt-get -y upgrade
+RUN pip3 install pyscf
+RUN pip3 install openfermionpyscf
+
+WORKDIR /opt/cp2k
+RUN rm -r ./src
+COPY ./src_dir/src ./src
+COPY ./scripts ./scripts
+
+RUN make -j ARCH=local VERSION=ssmp
+#RUN make -j test
+
+WORKDIR /opt
+COPY ./1_h2o_neb_test ./1_h2o_neb_test
+COPY ./2_benzene_geomopt_test ./2_benzene_geomopt_test
+COPY ./3_h2o_ri_test ./3_h2o_ri_test    
+COPY ./4_qmmm_mqae ./4_qmmm_mqae
+
+#WORKDIR /opt/1_h2o_neb_test
+#RUN chmod 777 job.sh 
+#RUN ./job.sh

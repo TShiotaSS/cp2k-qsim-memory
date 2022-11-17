@@ -1,0 +1,12 @@
+{
+    "description": "Real-Space and Plane-Wave Grids",
+    "requires": [
+        "fpga",
+        "fft",
+        "../common",
+        "cuda",
+        "../base",
+        "../mpiwrap",
+        "../offload",
+    ],
+}

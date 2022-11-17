@@ -1,0 +1,26 @@
+cp2kv9.1-qs on ubuntu22.04
+
+
+ディレクトリ構成
+|
+|---Dockerfile.v9.1-qs
+|
+|---1_nvt_water
+|
+|---2_qmmm_mqae
+|
+|---src_dir
+      |
+      |---src
+
+
+Build方法
+
+dockerfileのある階層で下記コマンドを実行
+docker build -t [イメージ名] -f ./Dockerfile.v9.1-qs .
+
+テストの実行方法
+
+1~4のテスト計算用directoryで下記コマンドを実行
+sh job.sh
+

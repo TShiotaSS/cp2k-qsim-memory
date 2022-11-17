@@ -1,0 +1,18 @@
+{
+    "description": "Entry points of CP2K",
+    "requires": [
+        "../",
+        "../common",
+        "../input",
+        "../grid",
+        "../pw",
+        "../fm",
+        "../tmc",
+        "../base",
+        "../mpiwrap",
+        "../offload",
+        "../swarm",
+        "../motion",
+        "../motion/mc",
+    ],
+}
